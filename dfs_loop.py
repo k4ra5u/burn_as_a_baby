@@ -16,28 +16,24 @@ from alibabacloud_ocr_api20210707 import models as ocr_api_20210707_models
 from alibabacloud_tea_util import models as util_models
 from alibabacloud_tea_util.client import Client as UtilClient
 from collections import defaultdict, deque
+import copy
 
 
 rows = 16
 cols = 10
-ori_matrix = None
-matrix = None
 use_api = True 
-hit_max_times =0
-dfs1_stop = 0
-dfs2_stop = 0
+accepted_target = 130
+stop_flag = 0
+max_num = 1250
+cur_num = 0
 # 全局变量存储鼠标拖动的起点和终点
 start_position = None
 end_position = None
 is_selecting = False
-lap = None
-submatrices = []
-sub_matrix_lens = 0
-max_orders = 0
-min_area = 160
-orders = []
+max_score = 0
+max_sum = 0
 final_order = []
-config = '--psm 6 --oem 1 -c tessedit_char_whitelist=0123456789'
+final_order_pre = []
 
 def mouse_down(x, y):
     """按下鼠标左键"""
@@ -76,7 +72,6 @@ def drag_rectangle(start_x, start_y, end_x, end_y, step=10):
     mouse_up(end_x, end_y)
     print(f"拖动完成：从 ({start_x}, {start_y}) 到 ({end_x}, {end_y})")
 
-
 def on_click(x, y, button, pressed):
     """鼠标点击事件监听"""
     global start_position, end_position, is_selecting
@@ -90,7 +85,6 @@ def on_click(x, y, button, pressed):
             is_selecting = False
             print(f"终点：{end_position}")
             return False  # 停止监听
-
 
 def on_move(x, y):
     """鼠标移动事件监听"""
@@ -113,7 +107,6 @@ def preprocess_image(image):
     
     # return pil_image
     return denoised
-
 
 def capture_and_recognize_matrix(start_pos, end_pos):
     """
@@ -195,7 +188,7 @@ def ocr_from_alibaba(image_stream):
             content_string = response.body.data.content
             print(content_string)
         else:
-            content_string = b'7 3 8 6 4 7 1 1 2 7 2 1 1 8 1 4 3 1 3 1 1 9 1 4 4 1 6 9 1 2 4 4 2 2 4 2 1 2 2 1 1 4 1 4 1 1 1 4 7 7 5 2 4 5 1 2 2 1 4 4 1 7 7 1'
+            content_string = b'3 2 6 2 4 6 5 5 9 3 6 5 7 9 2 7 5 8 6 6 4 1 4 1 2 7 8 4 7 9 2 4 1 7 5 2 3 4 6 6 5 6 4 6 1 2 9 7 4 8 9 4 4 6 3 9 2 3 5 5 4 5 8 6 4 9 7 3 9 3 3 3 7 3 1 5 9 1 3 8 3 6 8 7 2 3 2 8 9 4 1 9 4 2 9 7 7 1 1 5 3 5 5 2 1 1 2 2 4 9 8 3 1 8 9 3 7 2 2 8 3 2 5 9 2 8 6 4 2 6 9 5 6 9 4 8 1 7 9 4 1 8 8 9 4 9 5 6 1 4 5 7 7 2 3 4 8 1 8 1 '
 
         # 提取数字并转换为列表
         content_list = list(map(int, content_string.split()))
@@ -237,23 +230,35 @@ def check_overlap(sm1,sm2):
         return True  # 有重叠
     return False  # 没有重叠
 
+# 在当前matrix下每一轮最多的解法
+def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,start,step,order,cur_area):
+    global accepted_target
+    global stop_flag
+    global final_order
+    global final_order_pre
+    global max_score
 
-def dfs(vis,graph,indegree,start,step,order,cur_area):
-    global max_orders
-    global hit_max_times
-    global dfs1_stop
-    global orders
-    global min_area
-    if dfs1_stop == 1:
-        return
+    sub_matrix_lens = len(submatrices)
+    if dfs1_stop == 1 or stop_flag == 1:
+        return max_orders,hit_max_times
     if step == 0 :
         for subm in order:
             print(subm)
-        exit(0)
+        dfs1_stop = 1
+        orders = list(order)
+        return max_orders,hit_max_times
     visited_ids = []
+    # for j in range(sub_matrix_lens):
+    #     print(submatrices[j],indegree[j],"dfsa")
     for i in range(start,sub_matrix_lens):
-        if indegree[i] == 0 and vis[i] ==0 :
+        _,_,_,_,val,_ = submatrices[i]
+        if indegree[i] == 0 and vis[i] ==0:
             order.append(submatrices[i])
+            # print("appand",submatrices[i])
+            # if val != 10:
+            #     print(submatrices[i],"wrong")
+                # for j in range(sub_matrix_lens):
+                #     print(submatrices[j],indegree[j],"dfsb")
             visited_ids.append(i)
             vis[i] = 1
             for neighbor in graph[i]:
@@ -265,47 +270,69 @@ def dfs(vis,graph,indegree,start,step,order,cur_area):
             # print(i)
             a,b,c,d,_,_ = submatrices[i]
             this_area = (c+1-a)* (d+1-b)
-            dfs(vis,graph,indegree,start + 1,step - 1,order,cur_area + this_area)
-            if dfs1_stop == 1:
-                return
-            print(len(order),max_orders,step -1,cur_area + this_area)
+
+            # print("pre ",len(order),max_orders,step -1,cur_area + this_area)
+            max_orders,hit_max_times = dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,i + 1,step - 1,order,cur_area + this_area)
+            # 代表前面已经没有路了 统计当前是否是最优值
+            if dfs1_stop == 1 or stop_flag == 1:
+                return max_orders,hit_max_times
+            # print("aft ",len(order),max_orders,step -1,cur_area + this_area)
             if len(order) > max_orders:
                 orders = []
                 for subm in order:
                     orders.append(subm)
-                    print(subm)
-
-                    
+                    # print(subm)
                 max_orders = len(order)
                 hit_max_times = 0
+
             if len(order) == max_orders:
-                if cur_area + this_area > min_area:
-                    orders = []
-                    for subm in order:
-                        orders.append(subm)
-                    min_area = cur_area + this_area
+                if hit_max_times >= 5:
+                    copy_order = list(order)
+                    final_order_pre.append(copy_order)
+                    new_matrix = np.copy(matrix)
+                    for subm in copy_order:
+                        a,b,c,d,_,_ = subm
+                        for i in range(a,c+1):
+                            for j in range(b,d+1):
+                                new_matrix[i,j] = 0
+                    this_submatrices = list(submatrices)
+                    this_indegree = copy.deepcopy(indegree)
+                    # print("before:")
+                    # for j in range(sub_matrix_lens):
+                    #     print(submatrices[j],indegree[j])
+                    solve(new_matrix)
+                    submatrices = this_submatrices
+                    indegree = this_indegree
+                    # print("after:")
+                    # for j in range(sub_matrix_lens):
+                    #     print(submatrices[j],indegree[j])
+                    final_order_pre.pop()
+
                 hit_max_times += 1
-                if hit_max_times >= 50:
+                if hit_max_times >= 20:
                     dfs1_stop = 1        
-            order.pop()
+            s = order.pop()
+            # print("pop",s)
             for neighbor in graph[i]:
                 indegree[neighbor] += 1
             for j in visited_ids:
                 vis[j] = 0
             # print("back")
-    pass
+    return max_orders,hit_max_times
+# 在当前matrix状态下最多的得分
+def solve(matrix):
+    global stop_flag
+    global cur_num
+    global accepted_target
 
-def solve():
-    global sub_matrix_lens
-    global lap
-    global hit_max_times
-    global matrix
-    global submatrices
-    global max_orders
-    global dfs1_stop
-    global all_sum
-    global orders
-    global min_area
+
+    # pause()
+    global final_order
+    global final_order_pre
+    global max_score
+    # print(matrix)
+    if stop_flag == 1:
+        return 
     submatrices = []
     r, c = rows,cols 
     id = 0
@@ -327,7 +354,6 @@ def solve():
                         submatrix = [i,j,k,l,sub_sum,id]
                         submatrices.append(submatrix)
                         id +=1 
-                        # print(submatrix)
 
     
     # Step 2: Build dependency graph
@@ -347,61 +373,103 @@ def solve():
     
     # Step 3: Topological sorting
     for i in range(len(submatrices)):
-        print(submatrices[i])
+        # print(submatrices[i])
         if indegree[i] == 0 : 
             _,_,_,_,sub_sum,_ = submatrices[i]
             if sub_sum !=10:
-                indegree[i] = 1000  
-    vis = np.zeros((sub_matrix_lens), dtype=int)
-    order = []
-    print(all_sum)
-    dfs1_stop = 0
-    orders = []
-    min_area = 0
-    dfs(vis,graph,indegree,0,all_sum,order,0)
-    if orders != []:
-        pause()
+                indegree[i] = 1000000
+                for nabor in graph[i]:
+                    indegree[nabor] = 100000
+        # print(submatrices[i],indegree[i])
+    zero_cnt = 0
+    for i in range(len(submatrices)):
+        if indegree[i] == 0 :
+            zero_cnt = 1
+            break
+    if zero_cnt == 1:
+        vis = np.zeros((sub_matrix_lens), dtype=int)
+        order = []
+        # print(all_sum)
+        dfs1_stop = 0
+        orders = []
+        dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,0,all_sum,order,0)
+
+    # dfs返回说明当前matrix的遍历已经结束
+    if stop_flag == 1:
+        return
+    this_score = 0
+    for i in range(r):
+        for j in range(c):
+            if matrix[i,j] == 0:
+                this_score += 1
+
+    print(this_score,max_score)
+
+    if this_score > max_score:
+        max_score = this_score
+        final_order = list(final_order_pre)
+        print(final_order)
+        print(this_score,max_score)
+        print("solve: dfs fin")
+        print(matrix)
+        if max_score > accepted_target:
+            print(final_order)
+            print(this_score,max_score)
+            print("solve: dfs fin")
+            print(matrix)
+            pause()
+            stop_flag = 1
+    cur_num += 1 
+    if cur_num > max_num:
+        stop_flag = 1
+
+
+
+    
+    # if orders != []:
+    #     pause()
+    #     drag_rectangle_with_maze_id(0,0,0,0)
+    #     for subm in orders: 
+    #         a,b,c,d,_,_ = subm
+    #         print(subm)
+    #         sleep(0.3)
+    #         drag_rectangle_with_maze_id(a,b,c,d)
+
+    # for subm in orders:
+    #     a,b,c,d,_,_ = subm
+    #     for i in range(a,c+1):
+    #         for j in range(b,d+1):
+    #             matrix[i,j] = 0
+    # print(type(matrix))
+    # print(matrix)
+    # pause()
+    # solve()
+
+def entry():
+    global final_order
+    global max_score
+    global max_sum
+    global stop_flag
+    global cur_num
+    stop_flag = 0
+    cur_num = 0 
+    max_sum = matrix.sum()
+    max_score = 0
+    final_order = []
+    solve(matrix)
+    print("max score: ",max_score)
+
+    # pause()
+    for order in final_order:
         drag_rectangle_with_maze_id(0,0,0,0)
-        for subm in orders: 
+        for subm in order: 
             a,b,c,d,_,_ = subm
             print(subm)
-            sleep(0.3)
+            sleep(0.2)
             drag_rectangle_with_maze_id(a,b,c,d)
 
-    for subm in orders:
-        a,b,c,d,_,_ = subm
-        for i in range(a,c+1):
-            for j in range(b,d+1):
-                matrix[i,j] = 0
-    print(type(matrix))
-    print(matrix)
-    pause()
-    solve()
+    pass
 
-    # queue = deque([i for i in range(len(submatrices)) if indegree[i] == 0])
-    # order = []
-    # while queue:
-    #     node = queue.popleft()
-    #     order.append(node)
-    #     for neighbor in graph[node]:
-    #         indegree[neighbor] -= 1
-    #         if indegree[neighbor] == 0:
-    #             queue.append(neighbor)
-    
-    # # Step 4: Check if valid and return order
-    # if len(order) == len(submatrices):
-    #     for i in order:
-    #         print(submatrices[i])
-    #         a,b,c,d,sum,id = submatrices[i]
-    #         drag_rectangle_with_maze_id(a,b,c,d)
-    #         sleep(0.5)
-    # else:
-    #     print( None)  # No valid order found
-    #     for i in order:
-    #         print(submatrices[i])
-    #         a,b,c,d,sum,id = submatrices[i]
-    #         drag_rectangle_with_maze_id(a,b,c,d)
-    #         sleep(0.2)
 
 if __name__ == "__main__":
     print("请在屏幕上按住鼠标左键，从左上角框选一个矩形，然后释放左键...")
@@ -415,7 +483,7 @@ if __name__ == "__main__":
 
         matrix = capture_and_recognize_matrix(start_position, end_position)
         ori_matrix = np.copy(matrix)
-        solve()
+        entry()
 
         # print("开始模拟拖动...")
         # drag_rectangle(start_x, start_y, end_x, end_y)
