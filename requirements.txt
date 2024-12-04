@@ -1,0 +1,12 @@
+pwntools
+numpy
+pyobjc-framework-Quartz
+pyobjc
+pynput
+pytesseract
+pillow
+easyocr
+alibabacloud_ocr_api20210707
+alibabacloud_tea_openapi
+alibabacloud_tea_util
+alibabacloud_darabonba_stream

@@ -3,10 +3,8 @@ from pynput import mouse
 from Quartz import CGEventCreateMouseEvent, CGEventPost, kCGHIDEventTap
 from Quartz import kCGEventMouseMoved, kCGEventLeftMouseDown, kCGEventLeftMouseUp, kCGMouseButtonLeft
 from PIL import ImageGrab, Image
-import pytesseract
 import numpy as np
 import cv2
-import easyocr
 import io
 from pwn import *
 from alibabacloud_ocr_api20210707.client import Client as ocr_api20210707Client
@@ -24,7 +22,7 @@ cols = 10
 use_api = True 
 accepted_target = 140
 next_solve_min_times = 4
-next_solve_max_times = 15
+next_solve_max_times = 8
 
 # 全局变量存储鼠标拖动的起点和终点
 stop_flag = 0
@@ -274,7 +272,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
     #     print(submatrices[j],indegree[j],"dfsa")
     for i in range(start,sub_matrix_lens):
         _,_,_,_,val,_ = submatrices[i]
-        if indegree[i] == 0 and vis[i] ==0 and val < 30:
+        if indegree[i] == 0 and vis[i] ==0 and val <= 30:
             order.append(submatrices[i])
             # print("appand",submatrices[i])
             # if val != 10:
