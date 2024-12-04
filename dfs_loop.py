@@ -17,20 +17,19 @@ from alibabacloud_tea_util import models as util_models
 from alibabacloud_tea_util.client import Client as UtilClient
 from collections import defaultdict, deque
 import copy
-
+import time
 
 rows = 16
 cols = 10
 use_api = True 
-accepted_target = 130
+accepted_target = 140
 stop_flag = 0
-max_num = 1250
-cur_num = 0
 # 全局变量存储鼠标拖动的起点和终点
 start_position = None
 end_position = None
 is_selecting = False
 max_score = 0
+start_time = 0
 max_sum = 0
 final_order = []
 final_order_pre = []
@@ -49,6 +48,21 @@ def mouse_move(x, y):
     """移动鼠标到指定位置"""
     event = CGEventCreateMouseEvent(None, kCGEventMouseMoved, (x, y), kCGMouseButtonLeft)
     CGEventPost(kCGHIDEventTap, event)
+
+def mouse_click(x, y):
+    """
+    使用 CGEventCreateMouseEvent 模拟鼠标点击
+    :param x: 点击的 X 坐标
+    :param y: 点击的 Y 坐标
+    """
+    # 创建鼠标按下事件
+    event_down = CGEventCreateMouseEvent(None, kCGEventLeftMouseDown, (x, y), kCGMouseButtonLeft)
+    # 创建鼠标松开事件
+    event_up = CGEventCreateMouseEvent(None, kCGEventLeftMouseUp, (x, y), kCGMouseButtonLeft)
+    
+    # 发送事件
+    CGEventPost(kCGHIDEventTap, event_down)
+    CGEventPost(kCGHIDEventTap, event_up)
 
 def drag_rectangle(start_x, start_y, end_x, end_y, step=10):
     """
@@ -122,26 +136,31 @@ def capture_and_recognize_matrix(start_pos, end_pos):
 
     # 截图
     print(f"正在截图区域：({left}, {top}, {right}, {bottom})")
-    screenshot = ImageGrab.grab(bbox=(left, top, right, bottom))
-    # 将截屏转换为二进制数据
-    buffer = io.BytesIO()
-    screenshot.save(buffer, format='PNG')  # 可以选择格式，比如 PNG 或 JPEG
-    binary_data = buffer.getvalue()
+    for i in range(10):
+        try:
+            screenshot = ImageGrab.grab(bbox=(left, top, right, bottom))
+            # 将截屏转换为二进制数据
+            buffer = io.BytesIO()
+            screenshot.save(buffer, format='PNG')  # 可以选择格式，比如 PNG 或 JPEG
+            binary_data = buffer.getvalue()
 
-    # 图像预处理
-    # rsub_images = split_image_into_grid(screenshot, rows=8, cols=8)
-    # ocr_results = []
+            # 图像预处理
+            # rsub_images = split_image_into_grid(screenshot, rows=8, cols=8)
+            # ocr_results = []
 
-    # OCR 识别（保留布局）
-    print("正在识别矩阵中的数字...")
+            # OCR 识别（保留布局）
+            print("正在识别矩阵中的数字...")
 
 
-    matrix = ocr_from_alibaba(binary_data)
+            matrix = ocr_from_alibaba(binary_data)
 
-        
+                
 
-    print("识别结果：")
-    print(matrix)
+            print("识别结果：")
+            print(matrix)
+            break
+        except Exception as e:
+            continue
     return matrix
 
 
@@ -252,7 +271,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
     #     print(submatrices[j],indegree[j],"dfsa")
     for i in range(start,sub_matrix_lens):
         _,_,_,_,val,_ = submatrices[i]
-        if indegree[i] == 0 and vis[i] ==0:
+        if indegree[i] == 0 and vis[i] ==0 and val < 30:
             order.append(submatrices[i])
             # print("appand",submatrices[i])
             # if val != 10:
@@ -272,7 +291,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
             this_area = (c+1-a)* (d+1-b)
 
             # print("pre ",len(order),max_orders,step -1,cur_area + this_area)
-            max_orders,hit_max_times = dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,i + 1,step - 1,order,cur_area + this_area)
+            max_orders,hit_max_times = dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,0,step - 1,order,cur_area + this_area)
             # 代表前面已经没有路了 统计当前是否是最优值
             if dfs1_stop == 1 or stop_flag == 1:
                 return max_orders,hit_max_times
@@ -286,7 +305,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
                 hit_max_times = 0
 
             if len(order) == max_orders:
-                if hit_max_times >= 5:
+                if hit_max_times >= 2:
                     copy_order = list(order)
                     final_order_pre.append(copy_order)
                     new_matrix = np.copy(matrix)
@@ -309,7 +328,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
                     final_order_pre.pop()
 
                 hit_max_times += 1
-                if hit_max_times >= 20:
+                if hit_max_times >= 8:
                     dfs1_stop = 1        
             s = order.pop()
             # print("pop",s)
@@ -322,7 +341,6 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
 # 在当前matrix状态下最多的得分
 def solve(matrix):
     global stop_flag
-    global cur_num
     global accepted_target
 
 
@@ -417,10 +435,10 @@ def solve(matrix):
             print(this_score,max_score)
             print("solve: dfs fin")
             print(matrix)
-            pause()
+            # pause()
             stop_flag = 1
-    cur_num += 1 
-    if cur_num > max_num:
+    cur_time = time.time()
+    if cur_time - start_time > 102:
         stop_flag = 1
 
 
@@ -472,20 +490,39 @@ def entry():
 
 
 if __name__ == "__main__":
-    print("请在屏幕上按住鼠标左键，从左上角框选一个矩形，然后释放左键...")
-    with mouse.Listener(on_click=on_click, on_move=on_move) as listener:
-        listener.join()
+    # print("请在屏幕上按住鼠标左键，从左上角框选一个矩形，然后释放左键...")
+    # with mouse.Listener(on_click=on_click, on_move=on_move) as listener:
+    #     listener.join()
+    while True:
+        retry_position = (1339.5, 743.29296875)
+        start_position = (1141.17578125, 250.79296875)
+        end_position = (1573.58203125, 940.92578125)
+        retry_x,retry_y = retry_position
+        start_time = time.time()
+        mouse_click(retry_x,retry_y)
+        mouse_click(retry_x,retry_y)
+        mouse_click(retry_x,retry_y)
+        # pause()
+        sleep(4)
 
-    if start_position and end_position:
-        print(f"捕获的矩形坐标：起点 {start_position}，终点 {end_position}")
-        start_x, start_y = start_position
-        end_x, end_y = end_position
 
-        matrix = capture_and_recognize_matrix(start_position, end_position)
-        ori_matrix = np.copy(matrix)
-        entry()
+        if start_position and end_position:
+            print(f"捕获的矩形坐标：起点 {start_position}，终点 {end_position}")
+            start_x, start_y = start_position
+            end_x, end_y = end_position
+            # (1141, 250, 1573, 940)
 
-        # print("开始模拟拖动...")
-        # drag_rectangle(start_x, start_y, end_x, end_y)
-    else:
-        print("未捕获到有效的矩形坐标")
+            matrix = capture_and_recognize_matrix(start_position, end_position)
+            ori_matrix = np.copy(matrix)
+            entry()
+            this_second = time.time()
+            if this_second - start_time >= 130:
+                continue
+            else:
+                sleep(130 - this_second + start_time)
+
+
+            # print("开始模拟拖动...")
+            # drag_rectangle(start_x, start_y, end_x, end_y)
+        else:
+            print("未捕获到有效的矩形坐标")
