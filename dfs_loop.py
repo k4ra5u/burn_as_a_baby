@@ -272,7 +272,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
     #     print(submatrices[j],indegree[j],"dfsa")
     for i in range(start,sub_matrix_lens):
         _,_,_,_,val,_ = submatrices[i]
-        if indegree[i] == 0 and vis[i] ==0 and val <= 30:
+        if indegree[i] == 0 and vis[i] ==0 and val < 30:
             order.append(submatrices[i])
             # print("appand",submatrices[i])
             # if val != 10:
