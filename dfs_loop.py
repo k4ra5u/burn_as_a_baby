@@ -23,8 +23,11 @@ rows = 16
 cols = 10
 use_api = True 
 accepted_target = 140
-stop_flag = 0
+next_solve_min_times = 4
+next_solve_max_times = 15
+
 # 全局变量存储鼠标拖动的起点和终点
+stop_flag = 0
 start_position = None
 end_position = None
 is_selecting = False
@@ -305,7 +308,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
                 hit_max_times = 0
 
             if len(order) == max_orders:
-                if hit_max_times >= 2:
+                if hit_max_times >= next_solve_min_times:
                     copy_order = list(order)
                     final_order_pre.append(copy_order)
                     new_matrix = np.copy(matrix)
@@ -328,7 +331,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
                     final_order_pre.pop()
 
                 hit_max_times += 1
-                if hit_max_times >= 8:
+                if hit_max_times >= next_solve_max_times:
                     dfs1_stop = 1        
             s = order.pop()
             # print("pop",s)
