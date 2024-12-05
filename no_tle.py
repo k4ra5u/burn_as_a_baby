@@ -19,11 +19,11 @@ import time
 
 rows = 10
 cols = 10
-use_api = False 
+use_api = True 
 accepted_target = rows * cols - 4
 next_solve_min_times = 1
-next_solve_max_times = 60
-last_submit_time = 3600
+next_solve_max_times = 2
+last_submit_time = 60
 basic_string =  b'6 1 1 8 1 2 1 2 3 4 1 2 4 2 2 9 4 1 5 6 1 7 9 3 1 3 5 7 3 2 1 2 3 3 7 8 5 6 4 4 2 2 6 1 8 2 6 5 1 7 1 8 6 8 9 5 1 3 3 5 2 2 2 2 1 8 3 2 2 2 1 3 6 9 4 1 8 3 3 7 1 1 2 2 7 4 1 1 1 4 1 7 2 1 1 2 7 1 4 1'
 
 # 全局变量存储鼠标拖动的起点和终点
@@ -368,12 +368,10 @@ def solve(matrix):
         return 
     submatrices = []
     r, c = rows,cols 
-    id = 0
     max_orders = 0
     hit_max_times = 0
     all_sum = matrix.sum() // 10
     
-    id = 0
     
     # Step 1: Find all valid submatrices
     for i in range(r):
@@ -382,13 +380,19 @@ def solve(matrix):
                 for l in range(j, c):
                     # Check if the sum is a multiple of 10
                     sub_sum = matrix[i:k+1, j:l+1].sum()
+                    no_zero_nums = 0
+                    for m in range(i,k+1):
+                        for n in range(j,l+1):
+                            if matrix[m,n] != 0:
+                                no_zero_nums += 1
                     # print(i,j,k,l,sub_sum)
                     if sub_sum > 0 and sub_sum % 10 == 0:
-                        submatrix = [i,j,k,l,sub_sum,id]
+                        submatrix = [i,j,k,l,sub_sum,no_zero_nums]
                         submatrices.append(submatrix)
-                        id +=1 
+                        # id +=1 
 
     
+    submatrices.sort(key=lambda x: x[-1])
     # Step 2: Build dependency graph
     graph = defaultdict(list)
     indegree = defaultdict(int)

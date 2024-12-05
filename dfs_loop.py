@@ -22,7 +22,7 @@ cols = 10
 use_api = True 
 accepted_target = rows * cols - 1
 next_solve_min_times = 1
-next_solve_max_times = 4
+next_solve_max_times = 6
 last_submit_time = 113
 
 # 全局变量存储鼠标拖动的起点和终点
@@ -272,7 +272,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,cha
     # for j in range(sub_matrix_lens):
     #     print(submatrices[j],indegree[j],"dfsa")
     for i in range(0,sub_matrix_lens):
-        _,_,_,_,val,_ = submatrices[i]
+        _,_,_,_,val,no_zero_nums = submatrices[i]
         if vis[i] ==0 and (i >=start or changed[i] >= 1):
             now_val = val - changed[i] *10
             if now_val !=10:
@@ -367,12 +367,10 @@ def solve(matrix):
         return 
     submatrices = []
     r, c = rows,cols 
-    id = 0
     max_orders = 0
     hit_max_times = 0
     all_sum = matrix.sum() // 10
     
-    id = 0
     
     # Step 1: Find all valid submatrices
     for i in range(r):
@@ -381,13 +379,19 @@ def solve(matrix):
                 for l in range(j, c):
                     # Check if the sum is a multiple of 10
                     sub_sum = matrix[i:k+1, j:l+1].sum()
+                    no_zero_nums = 0
+                    for m in range(i,k+1):
+                        for n in range(j,l+1):
+                            if matrix[m,n] != 0:
+                                no_zero_nums += 1
                     # print(i,j,k,l,sub_sum)
                     if sub_sum > 0 and sub_sum % 10 == 0:
-                        submatrix = [i,j,k,l,sub_sum,id]
+                        submatrix = [i,j,k,l,sub_sum,no_zero_nums]
                         submatrices.append(submatrix)
-                        id +=1 
+                        # id +=1 
 
     
+    submatrices.sort(key=lambda x: x[-1])
     # Step 2: Build dependency graph
     graph = defaultdict(list)
     indegree = defaultdict(int)
