@@ -21,7 +21,7 @@ rows = 16
 cols = 10
 use_api = True 
 accepted_target = 140
-next_solve_min_times = 4
+next_solve_min_times = 3
 next_solve_max_times = 8
 
 # 全局变量存储鼠标拖动的起点和终点
@@ -251,7 +251,7 @@ def check_overlap(sm1,sm2):
     return False  # 没有重叠
 
 # 在当前matrix下每一轮最多的解法
-def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,start,step,order,cur_area):
+def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,changed,graph,indegree,start,step,order,cur_area):
     global accepted_target
     global stop_flag
     global final_order
@@ -270,9 +270,9 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
     visited_ids = []
     # for j in range(sub_matrix_lens):
     #     print(submatrices[j],indegree[j],"dfsa")
-    for i in range(start,sub_matrix_lens):
+    for i in range(0,sub_matrix_lens):
         _,_,_,_,val,_ = submatrices[i]
-        if indegree[i] == 0 and vis[i] ==0 and val < 30:
+        if indegree[i] == 0 and vis[i] ==0 and val < 30 and (i >=start or changed[i] >= 1):
             order.append(submatrices[i])
             # print("appand",submatrices[i])
             # if val != 10:
@@ -283,6 +283,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
             vis[i] = 1
             for neighbor in graph[i]:
                 indegree[neighbor] -= 1
+                changed[neighbor] += 1
             for j in range(sub_matrix_lens):
                 if lap[i][j] == 1 and vis[j] == 0:
                     visited_ids.append(j)
@@ -292,7 +293,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
             this_area = (c+1-a)* (d+1-b)
 
             # print("pre ",len(order),max_orders,step -1,cur_area + this_area)
-            max_orders,hit_max_times = dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,0,step - 1,order,cur_area + this_area)
+            max_orders,hit_max_times = dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,changed,graph,indegree,i+1,step - 1,order,cur_area + this_area)
             # 代表前面已经没有路了 统计当前是否是最优值
             if dfs1_stop == 1 or stop_flag == 1:
                 return max_orders,hit_max_times
@@ -335,6 +336,7 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,gra
             # print("pop",s)
             for neighbor in graph[i]:
                 indegree[neighbor] += 1
+                changed[neighbor] -= 1
             for j in visited_ids:
                 vis[j] = 0
             # print("back")
@@ -407,11 +409,12 @@ def solve(matrix):
             break
     if zero_cnt == 1:
         vis = np.zeros((sub_matrix_lens), dtype=int)
+        changed = np.zeros((sub_matrix_lens), dtype=int)
         order = []
         # print(all_sum)
         dfs1_stop = 0
         orders = []
-        dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,graph,indegree,0,all_sum,order,0)
+        dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,changed,graph,indegree,0,all_sum,order,0)
 
     # dfs返回说明当前matrix的遍历已经结束
     if stop_flag == 1:
@@ -439,7 +442,7 @@ def solve(matrix):
             # pause()
             stop_flag = 1
     cur_time = time.time()
-    if cur_time - start_time > 102:
+    if cur_time - start_time > 100:
         stop_flag = 1
 
 
@@ -477,14 +480,22 @@ def entry():
     final_order = []
     solve(matrix)
     print("max score: ",max_score)
+    print(final_order)
+
+
 
     # pause()
+    drag_rectangle_with_maze_id(0,0,0,0)
     for order in final_order:
-        drag_rectangle_with_maze_id(0,0,0,0)
+        
         for subm in order: 
             a,b,c,d,_,_ = subm
+            for i in range(a,c+1):
+                for j in range(b,d+1):
+                    matrix[i,j] = 0
             print(subm)
-            sleep(0.2)
+            print(matrix)
+            sleep(0.1)
             drag_rectangle_with_maze_id(a,b,c,d)
 
     pass
@@ -494,11 +505,15 @@ if __name__ == "__main__":
     # print("请在屏幕上按住鼠标左键，从左上角框选一个矩形，然后释放左键...")
     # with mouse.Listener(on_click=on_click, on_move=on_move) as listener:
     #     listener.join()
+    # exit(0)
     while True:
-        retry_position = (1339.5, 743.29296875)
-        start_position = (1141.17578125, 250.79296875)
-        end_position = (1573.58203125, 940.92578125)
-        retry_x,retry_y = retry_position
+        start_position = (-218.31640625, 1302.23046875)
+        end_position = (216.94140625, 1995.8828125)
+        a1,b1 = start_position
+        a2,b2 = end_position
+        retry_x = (a1 + a2)/2
+        retry_y = b1*0.3+b2 * 0.7
+        retry_position = (retry_x,retry_y)
         start_time = time.time()
         mouse_click(retry_x,retry_y)
         mouse_click(retry_x,retry_y)
