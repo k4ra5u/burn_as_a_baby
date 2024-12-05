@@ -17,13 +17,14 @@ from collections import defaultdict, deque
 import copy
 import time
 
-rows = 16
+rows = 10
 cols = 10
-use_api = True 
-accepted_target = rows * cols - 1
+use_api = False 
+accepted_target = rows * cols - 4
 next_solve_min_times = 1
-next_solve_max_times = 4
-last_submit_time = 113
+next_solve_max_times = 60
+last_submit_time = 3600
+basic_string =  b'6 1 1 8 1 2 1 2 3 4 1 2 4 2 2 9 4 1 5 6 1 7 9 3 1 3 5 7 3 2 1 2 3 3 7 8 5 6 4 4 2 2 6 1 8 2 6 5 1 7 1 8 6 8 9 5 1 3 3 5 2 2 2 2 1 8 3 2 2 2 1 3 6 9 4 1 8 3 3 7 1 1 2 2 7 4 1 1 1 4 1 7 2 1 1 2 7 1 4 1'
 
 # 全局变量存储鼠标拖动的起点和终点
 stop_flag = 0
@@ -209,7 +210,7 @@ def ocr_from_alibaba(image_stream):
             content_string = response.body.data.content
             print(content_string)
         else:
-            content_string = b'3 2 6 2 4 6 5 5 9 3 6 5 7 9 2 7 5 8 6 6 4 1 4 1 2 7 8 4 7 9 2 4 1 7 5 2 3 4 6 6 5 6 4 6 1 2 9 7 4 8 9 4 4 6 3 9 2 3 5 5 4 5 8 6 4 9 7 3 9 3 3 3 7 3 1 5 9 1 3 8 3 6 8 7 2 3 2 8 9 4 1 9 4 2 9 7 7 1 1 5 3 5 5 2 1 1 2 2 4 9 8 3 1 8 9 3 7 2 2 8 3 2 5 9 2 8 6 4 2 6 9 5 6 9 4 8 1 7 9 4 1 8 8 9 4 9 5 6 1 4 5 7 7 2 3 4 8 1 8 1 '
+            content_string = basic_string
 
         # 提取数字并转换为列表
         content_list = list(map(int, content_string.split()))
@@ -500,7 +501,7 @@ def entry():
 
 
 
-    # pause()
+    pause()
     drag_rectangle_with_maze_id(0,0,0,0)
     for order in final_order:
         
@@ -511,50 +512,45 @@ def entry():
                     matrix[i,j] = 0
             print(subm)
             print(matrix)
-            # sleep(0.01)
+            sleep(0.1)
             drag_rectangle_with_maze_id(a,b,c,d)
 
     pass
 
 
 if __name__ == "__main__":
-    # print("请在屏幕上按住鼠标左键，从左上角框选一个矩形，然后释放左键...")
-    # with mouse.Listener(on_click=on_click, on_move=on_move) as listener:
-    #     listener.join()
-    # exit(0)
-    while True:
-        start_position = (-218.31640625, 1302.23046875)
-        end_position = (216.94140625, 1995.8828125)
-        a1,b1 = start_position
-        a2,b2 = end_position
-        retry_x = (a1 + a2)/2
-        retry_y = b1*0.3+b2 * 0.7
-        retry_position = (retry_x,retry_y)
-        start_time = time.time()
-        mouse_click(retry_x,retry_y)
-        mouse_click(retry_x,retry_y)
-        mouse_click(retry_x,retry_y)
-        # pause()
-        sleep(4)
+    print("请在屏幕上按住鼠标左键，从左上角框选一个矩形，然后释放左键...")
+    with mouse.Listener(on_click=on_click, on_move=on_move) as listener:
+        listener.join()
+
+    # start_position = (-218.31640625, 1302.23046875)
+    # end_position = (216.94140625, 1995.8828125)
+    a1,b1 = start_position
+    a2,b2 = end_position
+    retry_x = (a1 + a2)/2
+    retry_y = b1*0.3+b2 * 0.7
+    retry_position = (retry_x,retry_y)
+    start_time = time.time()
+    mouse_click(retry_x,retry_y)
+    mouse_click(retry_x,retry_y)
+    mouse_click(retry_x,retry_y)
+    # pause()
+    # sleep(4)
 
 
-        if start_position and end_position:
-            print(f"捕获的矩形坐标：起点 {start_position}，终点 {end_position}")
-            start_x, start_y = start_position
-            end_x, end_y = end_position
-            # (1141, 250, 1573, 940)
+    if start_position and end_position:
+        print(f"捕获的矩形坐标：起点 {start_position}，终点 {end_position}")
+        start_x, start_y = start_position
+        end_x, end_y = end_position
+        # (1141, 250, 1573, 940)
 
-            matrix = capture_and_recognize_matrix(start_position, end_position)
-            ori_matrix = np.copy(matrix)
-            entry()
-            this_second = time.time()
-            if this_second - start_time >= 130:
-                continue
-            else:
-                sleep(130 - this_second + start_time)
+        matrix = capture_and_recognize_matrix(start_position, end_position)
+        ori_matrix = np.copy(matrix)
+        entry()
+        this_second = time.time()
 
 
-            # print("开始模拟拖动...")
-            # drag_rectangle(start_x, start_y, end_x, end_y)
-        else:
-            print("未捕获到有效的矩形坐标")
+        # print("开始模拟拖动...")
+        # drag_rectangle(start_x, start_y, end_x, end_y)
+    else:
+        print("未捕获到有效的矩形坐标")
