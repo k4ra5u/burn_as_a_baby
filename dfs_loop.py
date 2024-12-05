@@ -272,7 +272,10 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,cha
     #     print(submatrices[j],indegree[j],"dfsa")
     for i in range(0,sub_matrix_lens):
         _,_,_,_,val,_ = submatrices[i]
-        if indegree[i] == 0 and vis[i] ==0 and val < 30 and (i >=start or changed[i] >= 1):
+        if vis[i] ==0 and (i >=start or changed[i] >= 1):
+            now_val = val - changed[i] *10
+            if now_val !=10:
+                continue
             order.append(submatrices[i])
             # print("appand",submatrices[i])
             # if val != 10:
@@ -296,6 +299,13 @@ def dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,cha
             max_orders,hit_max_times = dfs(matrix,dfs1_stop,orders,lap,submatrices,max_orders,hit_max_times,vis,changed,graph,indegree,i+1,step - 1,order,cur_area + this_area)
             # 代表前面已经没有路了 统计当前是否是最优值
             if dfs1_stop == 1 or stop_flag == 1:
+                s = order.pop()
+                # print("pop",s)
+                for neighbor in graph[i]:
+                    indegree[neighbor] += 1
+                    changed[neighbor] -= 1
+                for j in visited_ids:
+                    vis[j] = 0
                 return max_orders,hit_max_times
             # print("aft ",len(order),max_orders,step -1,cur_area + this_area)
             if len(order) > max_orders:
@@ -385,22 +395,28 @@ def solve(matrix):
     for i, sm1 in enumerate(submatrices):
         for j, sm2 in enumerate(submatrices):
             if i != j and check_full_overlap(sm1,sm2):  # Check full overlap
+                _,_,_,_,val1,_ = sm1
+                _,_,_,_,val2,_ = sm2
+                if val1 - val2 == 10:
                 # print(i,sm1,j,sm2)
-                graph[j].append(i)
-                indegree[i] += 1
+                    graph[j].append(i)
+                    indegree[i] += 1
             elif i!=j and check_overlap(sm1,sm2): # check overlap
                 lap[i,j] = lap[j,i] = 1
 
     
     # Step 3: Topological sorting
+    changed = np.zeros((sub_matrix_lens), dtype=int)
     for i in range(len(submatrices)):
         # print(submatrices[i])
         if indegree[i] == 0 : 
             _,_,_,_,sub_sum,_ = submatrices[i]
             if sub_sum !=10:
                 indegree[i] = 1000000
+                changed[i] = -100000
                 for nabor in graph[i]:
                     indegree[nabor] = 100000
+                    changed[nabor] = -100000
         # print(submatrices[i],indegree[i])
     zero_cnt = 0
     for i in range(len(submatrices)):
@@ -409,7 +425,6 @@ def solve(matrix):
             break
     if zero_cnt == 1:
         vis = np.zeros((sub_matrix_lens), dtype=int)
-        changed = np.zeros((sub_matrix_lens), dtype=int)
         order = []
         # print(all_sum)
         dfs1_stop = 0
@@ -442,7 +457,7 @@ def solve(matrix):
             # pause()
             stop_flag = 1
     cur_time = time.time()
-    if cur_time - start_time > 100:
+    if cur_time - start_time > 103:
         stop_flag = 1
 
 
@@ -495,7 +510,7 @@ def entry():
                     matrix[i,j] = 0
             print(subm)
             print(matrix)
-            sleep(0.1)
+            # sleep(0.01)
             drag_rectangle_with_maze_id(a,b,c,d)
 
     pass
